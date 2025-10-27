@@ -13,9 +13,12 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 # --- Page setup ---
-st.set_page_config(page_title="File Reformatting App", layout="centered")
+st.set_page_config(page_title="File Reformatting App", 
+                    page_icon="📊",
+                    layout="centered")
 
-st.title("Platform Eleven to Investran Excel Sheet Converter")
+st.title("📁 Platform Eleven to Investran Excel Sheet Converter")
+st.caption("Easily upload, process, and download your Investran data files.")
 
 # --- File uploaders ---
 st.subheader("Step 1: Upload Files")
@@ -37,6 +40,7 @@ if uploaded_cont is not None:
     st.dataframe(cont_df.head())
 
 # --- Text inputs ---
+st.divider()
 st.subheader("Step 2: Provide Input Details")
 
 contact_domain = st.text_input('Enter "Contact Domain" for sheet 1:')
@@ -389,6 +393,9 @@ with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
 
 # Move to the start of the stream so it can be read
 zip_buffer.seek(0)
+
+st.divider()
+st.header("Step 3: Process & Download") 
 
 # Streamlit download button for ZIP
 st.download_button(
