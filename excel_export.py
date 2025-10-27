@@ -1,0 +1,399 @@
+import streamlit as st
+import io
+import pandas as pd
+import numpy as np
+import zipfile
+
+# --- Hide Streamlit default error tracebacks ---
+hide_streamlit_style = """
+    <style>
+    .stException {display: none;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
+# --- Page setup ---
+st.set_page_config(page_title="File Reformatting App", layout="centered")
+
+st.title("Platform Eleven to Investran Excel Sheet Converter")
+
+# --- File uploaders ---
+st.subheader("Step 1: Upload Files")
+# Initialize dataframes if uploaded
+trans_df, cont_df = None, None
+
+uploaded_trans = st.file_uploader("Upload **TRANSACTION** CSV file", type=["csv"])
+if uploaded_trans is not None:
+    trans_df = pd.read_csv(uploaded_trans)
+    st.success("TRANSACTION file uploaded successfully!")
+    st.write("Preview of TRANSACTION file:")
+    st.dataframe(trans_df.head())
+
+uploaded_cont = st.file_uploader("Upload **CONTACT** CSV file", type=["csv"])
+if uploaded_cont is not None:
+    cont_df = pd.read_csv(uploaded_cont)
+    st.success("CONTACT file uploaded successfully!")
+    st.write("Preview of CONTACT file:")
+    st.dataframe(cont_df.head())
+
+# --- Text inputs ---
+st.subheader("Step 2: Provide Input Details")
+
+contact_domain = st.text_input('Enter "Contact Domain" for sheet 1:')
+vehicle = st.text_input('Enter "Vehicle" for sheet 4:')
+vehicle_close_date = st.text_input('Enter "Specific Vehicle Close Date" (MM/DD/YYYY) for sheet 5:')
+commitment_closing_date = st.text_input('Enter "Investor Commitment Closing Date" (MM/DD/YYYY) for sheet 5:')
+commitment_date = st.text_input('Enter "Investor Commitment Commitment Date" (MM/DD/YYYY) for sheet 5:')
+
+# --- Button to continue ---
+if st.button("Process Data"):
+    if trans_df is not None and cont_df is not None:
+        st.success("Files and inputs captured successfully!")
+        st.write("**Contact Domain:**", contact_domain)
+        st.write("**Vehicle:**", vehicle)
+        st.write("**Vehicle Close Date:**", vehicle_close_date)
+        st.write("**Commitment Closing Date:**", commitment_closing_date)
+        st.write("**Commitment Date:**", commitment_date)
+        
+        # You can add your data processing logic here using trans_df and cont_df
+    else:
+        st.error("Please upload both TRANSACTION and CONTACT files before proceeding.")
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+# Initialize additional packages and import and reformat starting CSVs
+trans_df = trans_df.reindex(columns=["investorName", "investorSourceId", "fundName", "commitment", "authorizedInvestor", "domicile", 
+                                     "formPfInvestorType", "investorType", "isDisregardedEntity", "isUsTaxExempt", "qpAssets25",
+                                     "qpAssets5", "signers", "ssn", "ein", "personOrEntity", "state", "street", "city","zip",
+                                     "nomineeName", "nomineeAccountNo", "erisaVehicle", "benefitPlanPercent"], fill_value = pd.NA)
+cont_df = cont_df.reindex(columns=["transactionContactId", "investmentId", "relationship", "email", "firstName", "lastName","fullName",
+                                   "contactPhone"], fill_value = pd.NA)
+
+pd.set_option('display.max_columns', None)
+
+# Intialize 5 dataframes with column names. To be populated with information later
+df1 = pd.DataFrame(columns=["Contact Domain", "Contact File As", "Contact Type", "Individual First Name", "Individual Last Name"])
+df2 = pd.DataFrame(columns=["Contact ID", "Contact Type", "Contact Domain", "Contact File As", "Email Email", "Email Email is Default",
+                            "Business Address is Default", "Business Address Street", "Business Address City", "Business Address State",
+                            "Business Address Zip/Postal Code", "Home Phone", "Primary Phone"])
+df3 = pd.DataFrame(columns=["Investor Domain", "Investor Socium ID", "Investor Name", "Linked Contact", "Linked Contact ID",
+                            "Linked Contact Type", "Linked Contact Domain", "Client GL Investor Name", "Investor Legal Name",
+                            "Investor Classification", "Individual or Organization", "Investor SubType", "Investor Tax ID",
+                            "Qualified Purchaser", "Accredited Investor", "Is IRA", "Domicile", "Domestic/Foreign",
+                            "Relationship", "Client GL Investor ID", "Tax Exempt", "Disregarded Entity", "ERISA", "ERISA %",
+                            "Form PF Investor Type"])
+df4 = pd.DataFrame(columns=["Legal Entity", "Vehicle", "Investor"])
+df5 = pd.DataFrame(columns=["Legal Entity", "Vehicle", "Specific Vehicle Close Date", "Investor", "Investor Commitment Amount",
+                            "Investor Commitment Closing Date", "Investor Commitment Commitment Date"])
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+# Remove unecessary contacts
+# --- Helper to parse signers like "[1234567,7654321]" or "[1234567,null]" ---
+def parse_signers(value):
+    s = str(value).strip()
+    # handle empty or NaN
+    if not s or s.lower() == 'nan':
+        return [None, None]
+    s = s.strip("[]").replace(" ", "")
+    parts = s.split(",")
+    # ensure length 2
+    if len(parts) == 1:
+        parts = parts + [None]
+    parsed = []
+    for p in parts[:2]:
+        if p is None:
+            parsed.append(None)
+        else:
+            pl = str(p).strip()
+            parsed.append(None if pl.lower() == "null" or pl == "" else int(pl))
+    return parsed  # [first_signer_or_None, second_signer_or_None]
+
+# --- 1) Parse signers into two columns for safety ---
+trans_df[['first_signer', 'second_signer']] = trans_df['signers'].apply(
+    lambda x: pd.Series(parse_signers(x))
+)
+
+# --- 2) Build sets of first and second signers (integers) ---
+first_signer_ids = set(trans_df['first_signer'].dropna().astype(int).tolist())
+second_signer_ids = set(trans_df['second_signer'].dropna().astype(int).tolist())
+
+# --- 3) Normalize cont_df transactionContactId to numeric for safe comparison ---
+cont_df = cont_df.copy()  # avoid modifying original reference unexpectedly
+cont_df['transactionContactId_num'] = pd.to_numeric(cont_df['transactionContactId'], errors='coerce').astype('Int64')
+
+# --- 4) Remove any cont_df rows that match second signers (when both present) ---
+before_count = len(cont_df)
+cont_df = cont_df[~cont_df['transactionContactId_num'].isin(second_signer_ids)]
+removed_second_count = before_count - len(cont_df)
+
+# --- 5) Determine investmentIds that have at least one 'contact' (case-insensitive) ---
+cont_df['relationship_lc'] = cont_df['relationship'].astype(str).str.lower()
+investment_has_contact = set(
+    cont_df.loc[cont_df['relationship_lc'] == 'contact', 'investmentId'].dropna().unique()
+)
+
+# --- 6) Keep rows according to the rules:
+#    - If an investmentId has a contact, keep only rows for that investment where relationship == 'contact'
+#    - Otherwise, keep rows whose transactionContactId is in the first_signer_ids set
+#
+# Note: use the numeric transactionContactId_num for comparison.
+keep_mask_contact_investments = cont_df['investmentId'].isin(investment_has_contact) & (cont_df['relationship_lc'] == 'contact')
+keep_mask_no_contact = ~cont_df['investmentId'].isin(investment_has_contact) & cont_df['transactionContactId_num'].isin(first_signer_ids)
+
+final_keep_mask = keep_mask_contact_investments | keep_mask_no_contact
+
+before_final_count = len(cont_df)
+cont_df = cont_df[final_keep_mask].copy()
+
+removed_final_count = before_final_count - len(cont_df)
+
+# --- Cleanup temporary columns ---
+cont_df.drop(columns=['transactionContactId_num', 'relationship_lc'], inplace=True)
+trans_df.drop(columns=['first_signer', 'second_signer'], inplace=True)
+
+# --- Make both dfs the same length
+num_trans_rows = len(trans_df)
+num_cont_rows = len(cont_df)
+
+if num_cont_rows < num_trans_rows:
+    # Find how many rows we need to add
+    rows_to_add = num_trans_rows - num_cont_rows
+
+    # Create empty rows (same columns, filled with NaN)
+    empty_rows = pd.DataFrame(
+        {col: [pd.NA] * rows_to_add for col in cont_df.columns}
+    )
+
+    # Append them to the end of cont_df
+    cont_df = pd.concat([cont_df, empty_rows], ignore_index=True)
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+# Populate df1
+df1["Contact Domain"] = contact_domain
+df1["Contact File As"] = cont_df["fullName"]
+df1["Contact Type"] = "Individual"
+df1["Individual First Name"] = cont_df["firstName"]
+df1["Individual Last Name"] = cont_df["lastName"]
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+# Populate df2
+df2["Contact ID"] = None # Manual Entry (to be done after files are output)
+df2["Contact Type"] = df1["Contact Type"]
+df2["Contact Domain"] = df1["Contact Domain"]
+df2["Contact File As"] = df1["Contact File As"]
+df2["Email Email"] = cont_df["email"]
+df2["Email Email is Default"] = np.where(df2["Email Email"].notna(), "yes", pd.NA)
+df2["Business Address Street"] = trans_df["street"]
+df2["Business Address is Default"] = np.where(df2["Business Address Street"].notna(), "yes", pd.NA)
+df2["Business Address City"] = trans_df["city"]
+df2["Business Address State"] = trans_df["state"]
+df2["Business Address Zip/Postal Code"] = trans_df["zip"]
+df2["Home Phone"] = cont_df["contactPhone"]
+df2["Primary Phone"] = np.where(df2["Home Phone"].notna(), "yes", pd.NA)
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+# Populate df 3
+df3["Investor Domain"] = df1["Contact Domain"]
+df3["Investor Socium ID"] = trans_df["investorSourceId"]
+df3["Investor Name"]  = trans_df["investorName"] + ": " + trans_df["investorSourceId"]
+df3["Linked Contact"] = df2["Contact File As"]
+df3["Linked Contact ID"] = df2["Contact ID"]
+df3["Linked Contact Type"] = df2["Contact Type"]
+df3["Linked Contact Domain"] = df2["Contact Domain"]
+df3["Client GL Investor Name"] = trans_df["investorName"]
+df3["Investor Legal Name"] = trans_df["investorName"]
+
+# Assign df3 "Investor Classification" using np.where
+df3["Investor Classification"] = np.where(trans_df["personOrEntity"] == "entity", "Organization", "Individual")
+
+df3["Individual or Organization"] = df3["Investor Classification"]
+
+# Assign df3 "Investor SubType" using a mapping
+investor_subtype_mapping = {
+    "trust": "Trust",
+    "revocableTrust": "Revocable Trust",
+    "jointTenants": "Joint TIC",
+    "tenantsInCommon": "Joint TIC",
+    "nonRetirement": "Natural Person",
+    "partnership": "Limited Partnership",
+    "llc": "Limited Liability Company",
+    "corporation": "Corporation",
+    "ira": "IRA",
+    "privatePension": "Pension Plan",
+    "foundation": "Foundation"
+}
+df3["Investor SubType"] = trans_df["investorType"].map(investor_subtype_mapping).fillna("Unrecognized value") # Handle unrecognized values
+
+# Remove hyphens from 'ssn' and 'ein'
+trans_df["ssn"] = trans_df["ssn"].astype(str).str.replace("-", "")
+trans_df["ein"] = trans_df["ein"].astype(str).str.replace("-", "")
+# Assign df3 "Investor Tax ID" based on 'ssn' and 'ein'
+def get_tax_id(row):
+    ssn = row["ssn"]
+    ein = row["ein"]
+    if pd.notna(ssn) and pd.isna(ein):
+        return ssn
+    elif pd.isna(ssn) and pd.notna(ein):
+        return ein
+    else:
+        return "Error: Exactly one of SSN or EIN must be populated"
+
+df3["Investor Tax ID"] = trans_df.apply(get_tax_id, axis=1)
+
+# Assign "Qualified Purchaser" using mapping
+qualified_purchaser_mapping = {
+    "yes": "Y",
+    "no": "N"
+}
+df3["Qualified Purchaser"] = trans_df["qpAssets5"].map(qualified_purchaser_mapping).fillna("Y") # Assuming blank means Y
+
+# Assign "Accredited Investor" using mapping
+accredited_investor_mapping = {
+    "Yes": "Y",
+    "No": "N"
+}
+df3["Accredited Investor"] = trans_df["authorizedInvestor"].map(accredited_investor_mapping).fillna("Unrecognized value") # Handle unrecognized values
+
+# Assign "Is IRA" using np.where
+df3["Is IRA"] = np.where(trans_df["investorType"] == "ira", "Y", "N")
+
+# Assign df3 "Domicile" using a mapping
+domicile_mapping = {
+    "CA": "Canada",
+    "KY": "Cayman Islands",
+    "JE": "Jersey",
+    "LU": "Luxembourg",
+    "MC": "Monaco",
+    "PA": "Republic of Panama",
+    "GB": "Scotland",
+    "SG": "Singapore",
+    "KR": "South Korea",
+    "ES": "Spain",
+    "CH": "Switzerland",
+    "US": "USA",
+}
+df3["Domicile"] = trans_df["domicile"].map(domicile_mapping).fillna("Unrecognized value") # Handle unrecognized values
+
+# Assign "Is IRA" using np.where
+df3["Domestic/Foreign"] = np.where(df3["Domicile"] == "USA", "Domestic", "Foreign")
+
+df3["Relationship"] = trans_df["nomineeName"]
+df3["Client GL Investor ID"] = trans_df["nomineeAccountNo"]
+
+#Assign "Tax Exempt" using mapping
+tax_exempt_mapping = {
+    "yes": "Y",
+    "no": "N"
+}
+df3["Tax Exempt"] = trans_df["isUsTaxExempt"].map(tax_exempt_mapping)
+
+# Assign "Disregarded Entity" using mapping
+disregarded_entity_mapping = {
+    "yes": "Y",
+    "no": "N"
+}
+df3["Disregarded Entity"] = trans_df["isDisregardedEntity"].map(disregarded_entity_mapping)
+
+# Assign "ERISA" using np.where
+df3["ERISA"] = np.where(trans_df["erisaVehicle"] == "yes", "Y", "N")
+#Assign "ERISA" using mapping
+erisa_mapping = {
+    "yes": "Y",
+    "no": "N"
+}
+df3["ERISA"] = trans_df["erisaVehicle"].map(erisa_mapping)
+
+# Assign "ERISA %" but stripping "%" and makig it a decimal
+df3["ERISA %"] = trans_df["benefitPlanPercent"].apply(
+    lambda x: float(str(x).replace('%', '')) / 100 if pd.notna(x) else pd.NA)
+
+# Assign "Form PF Investor Type" using mapping
+form_pf_investor_type_mapping = {
+    "formPfBankThirft": "Bank or Thrift Institution (proprietary)",
+    "formPfBrokerDealer": "Broker-Dealer",
+    "formPfInsurance": "Insurance Company",
+    "formPfNonProfit": "Investment Company registered with the SEC",
+    "formPfNonUsMultiple": "Non-Profit",
+    "formPfNonUsPerson": "Non-US Individual or Trust",
+    "formPfOther": "Non-US Investor beneficial ownership unknown & held through a chain of intermediaries",
+    "formPfPension": "Other",
+    "formPfPrivateFund": "Pension Plan (Government)",
+    "formPfRegInvCo": "Pension plan (Non-Government)",
+    "formPfSwf": "Private Fund",
+    "formPfUsGov": "Sovereign Wealth Fund / Foreign Official Institution",
+    "formPfUsPension": "State or Municipal Government entity (not pension plan)",
+    "formPfUsPerson": "United States Individual or Trust"
+}
+df3["Form PF Investor Type"] = trans_df["formPfInvestorType"].map(form_pf_investor_type_mapping).fillna("Unrecognized value") # Handle unrecognized values
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+# Populate df4
+df4["Legal Entity"] = trans_df["fundName"]
+df4["Vehicle"] = vehicle
+df4["Investor"] = df3["Investor Name"]
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+# Populate df5
+df5["Legal Entity"] = trans_df["fundName"]
+df5["Vehicle"] = df4["Vehicle"]
+df5["Specific Vehicle Close Date"] = vehicle_close_date
+df5["Investor"] = df3["Investor Name"]
+df5["Investor Commitment Amount"] = trans_df["commitment"]
+df5["Investor Commitment Closing Date"] = commitment_closing_date
+df5["Investor Commitment Commitment Date"] = commitment_date
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+# Make sure manual input domains are properly assigned
+df1["Contact Domain"] = contact_domain
+df4["Vehicle"] = vehicle
+df5["Specific Vehicle Close Date"] = vehicle_close_date
+df5["Investor Commitment Closing Date"] = commitment_closing_date
+df5["Investor Commitment Commitment Date"] = commitment_date
+
+df2["Contact Domain"] = df1["Contact Domain"]
+df3["Investor Domain"] = df1["Contact Domain"]
+df3["Linked Contact Domain"] = df2["Contact Domain"]
+df5["Vehicle"] = df4["Vehicle"]
+
+# Make sure all sheets have the same number of rows 
+trans_df = trans_df.dropna(subset=["investorName"])
+num_rows = len(trans_df)
+
+# Assign number of transaction rows to all other DataFrames
+df1 = df1.head(num_rows).copy()
+df2 = df2.head(num_rows).copy()
+df3 = df3.head(num_rows).copy()
+df4 = df4.head(num_rows).copy()
+df5 = df5.head(num_rows).copy()
+
+# ------------------------------------------------------------------------------------------------------------------------
+
+# Output DataFrame contnets as csv files 
+# Create an in-memory ZIP file
+zip_buffer = io.BytesIO()
+
+with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+    # Write each CSV into the ZIP
+    zf.writestr("1 - Investran Contact Upload.csv", df1.to_csv(index=False))
+    zf.writestr("2 - Investran Contact Details.csv", df2.to_csv(index=False))
+    zf.writestr("3 - Investran Investor Upload.csv", df3.to_csv(index=False))
+    zf.writestr("4 - Investran Specific Investors.csv", df4.to_csv(index=False))
+    zf.writestr("5 - Investran Commitments.csv", df5.to_csv(index=False))
+
+# Move to the start of the stream so it can be read
+zip_buffer.seek(0)
+
+# Streamlit download button for ZIP
+st.download_button(
+    label="📦 Download All Processed Files (ZIP)",
+    data=zip_buffer,
+    file_name= "Investran Uploads - Reformatted.zip",
+    mime= "application/zip"
+)
