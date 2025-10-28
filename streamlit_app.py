@@ -17,31 +17,57 @@ st.set_page_config(page_title="File Reformatting App",
                     page_icon="📊",
                     layout="centered")
 
-st.title("📁 Platform Eleven to Investran Excel Sheet Converter")
+st.title("📁 Platform Eleven to Investran  Excel Sheet Converter")
 st.caption("Easily upload, process, and download your Investran data files.")
 
 # --- File uploaders ---
-st.subheader("Step 1: Upload Files")
+st.subheader("Step 1️⃣: Upload Files")
 # Initialize dataframes if uploaded
 trans_df, cont_df = None, None
 
-uploaded_trans = st.file_uploader("Upload **TRANSACTION** CSV file", type=["csv"])
-if uploaded_trans is not None:
-    trans_df = pd.read_csv(uploaded_trans)
-    st.success("TRANSACTION file uploaded successfully!")
-    st.write("Preview of TRANSACTION file:")
+# --- Combine files into one DataFrame ---
+def combine_uploaded_files(uploaded_files):
+    if not uploaded_files:
+        return None
+    dfs = []
+    for file in uploaded_files:
+        try:
+            df = pd.read_csv(file)
+            dfs.append(df)
+        except Exception as e:
+            st.warning(f"⚠️ Could not read {file.name}: {e}")
+    if dfs:
+        combined_df = pd.concat(dfs, ignore_index=True)
+        st.success(f"✅ Combined {len(dfs)} files ({sum(len(d) for d in dfs)} total rows)")
+        return combined_df
+    return None
+
+# Upload and process Transaction files
+uploaded_trans = st.file_uploader("Upload **TRANSACTION** CSV files (you may select multiple files)", 
+                                  type=["csv"], 
+                                  accept_multiple_files=True) 
+
+trans_df = combine_uploaded_files(uploaded_trans)
+
+if trans_df is not None:
+    st.write("Preview of combined TRANSACTION file:")
     st.dataframe(trans_df.head())
 
-uploaded_cont = st.file_uploader("Upload **CONTACT** CSV file", type=["csv"])
-if uploaded_cont is not None:
-    cont_df = pd.read_csv(uploaded_cont)
-    st.success("CONTACT file uploaded successfully!")
-    st.write("Preview of CONTACT file:")
+# Upload and process Contact files
+uploaded_cont = st.file_uploader("Upload **CONTACT** CSV files (you may select multiple files)", 
+                                 type=["csv"],
+                                 accept_multiple_files=True)
+
+
+cont_df = combine_uploaded_files(uploaded_cont)
+
+if cont_df is not None:
+    st.write("Preview of combined CONTACT file:")
     st.dataframe(cont_df.head())
 
 # --- Text inputs ---
 st.divider()
-st.subheader("Step 2: Provide Input Details")
+st.subheader("Step 2️⃣: Provide Input Details")
 
 contact_domain = st.text_input('Enter "Contact Domain" for sheet 1:')
 vehicle = st.text_input('Enter "Vehicle" for sheet 4:')
@@ -395,12 +421,12 @@ with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
 zip_buffer.seek(0)
 
 st.divider()
-st.header("Step 3: Process & Download") 
+st.subheader("Step 3️⃣: Process & Download") 
 
 # Streamlit download button for ZIP
 st.download_button(
     label="📦 Download All Processed Files (ZIP)",
     data=zip_buffer,
-    file_name= "Investran Uploads - Reformatted.zip",
+    file_name= "Investran Uploads Reformatted.zip",
     mime= "application/zip"
 )

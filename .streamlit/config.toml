@@ -2,5 +2,5 @@
 primaryColor = "#0E76A8"        # a nice blue (LinkedIn-style)
 backgroundColor = "#F5F7FA"     # soft gray background
 secondaryBackgroundColor = "#FFFFFF"
-textColor = "#262730"
+textColor = "#2f398fff"
 font = "sans serif"
