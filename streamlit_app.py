@@ -437,6 +437,9 @@ zip_buffer.seek(0)
 st.divider()
 st.subheader("Step 3️⃣: Process & Download") 
 
+st.write("Reminder!: Contact ID fields must be filled after running through Investran.")
+st.write("The \"Linked Contact ID\" in **3 - Investran Investor Upload.csv** must then be populated manually.")
+
 
 # Streamlit download button for ZIP
 st.download_button(
@@ -446,5 +449,3 @@ st.download_button(
     mime= "application/zip"
 )
 
-st.write("Reminder!: Contact ID fields must be filled after running through Investran.")
-st.write("The \"Linked Contact ID\" in **3 - Investran Investor Upload.csv** must then be populated manually.")
