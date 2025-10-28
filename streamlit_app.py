@@ -84,8 +84,6 @@ if st.button("Process Data"):
         st.write("**Vehicle Close Date:**", vehicle_close_date)
         st.write("**Commitment Closing Date:**", commitment_closing_date)
         st.write("**Commitment Date:**", commitment_date)
-        
-        # You can add your data processing logic here using trans_df and cont_df
     else:
         st.error("Please upload both TRANSACTION and CONTACT files before proceeding.")
 
@@ -439,6 +437,7 @@ zip_buffer.seek(0)
 st.divider()
 st.subheader("Step 3️⃣: Process & Download") 
 
+
 # Streamlit download button for ZIP
 st.download_button(
     label="📦 Download All Processed Files (ZIP)",
@@ -446,3 +445,6 @@ st.download_button(
     file_name= "Investran Uploads Reformatted.zip",
     mime= "application/zip"
 )
+
+st.write("Reminder!: Contact ID fields must be filled after running through Investran.")
+st.write("The \"Linked Contact ID\" in **3 - Investran Investor Upload.csv** must then be populated manually.")
