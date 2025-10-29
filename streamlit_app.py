@@ -22,7 +22,7 @@ st.caption("Easily upload, process, and download your Investran data files.")
 
 # --- File uploaders ---
 st.subheader("Step 1️⃣: Upload Files")
-# Initialize dataframes if uploaded
+# Initialize dataframes if uploaded 
 trans_df, cont_df = None, None
 
 # --- Combine files into one DataFrame ---
@@ -408,9 +408,8 @@ zip_buffer.seek(0)
 st.divider()
 st.subheader("Step 3️⃣: Process & Download") 
 
-st.markdown("Reminder!: Contact ID fields must be filled after running through Investran.\n\n"\
-    "The \"Linked Contact ID\" in **3 - Investran Investor Upload.csv** must then be populated manually.")
-
+st.markdown("Reminder! - Contact ID fields must be filled manually after running through Investran. " \
+            "\n\nThese fields are in sheets **2** and **3**")
 
 # Streamlit download button for ZIP
 st.download_button(
