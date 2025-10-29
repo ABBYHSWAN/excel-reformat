@@ -117,15 +117,14 @@ df5 = pd.DataFrame(columns=["Legal Entity", "Vehicle", "Specific Vehicle Close D
 # ------------------------------------------------------------------------------------------------------------------------
 
 # Remove unecessary contacts
+
 # --- Helper to parse signers like "[1234567,7654321]" or "[1234567,null]" ---
 def parse_signers(value):
     s = str(value).strip()
-    # handle empty or NaN
     if not s or s.lower() == 'nan':
         return [None, None]
     s = s.strip("[]").replace(" ", "")
     parts = s.split(",")
-    # ensure length 2
     if len(parts) == 1:
         parts = parts + [None]
     parsed = []
@@ -137,64 +136,36 @@ def parse_signers(value):
             parsed.append(None if pl.lower() == "null" or pl == "" else int(pl))
     return parsed  # [first_signer_or_None, second_signer_or_None]
 
-# --- 1) Parse signers into two columns for safety ---
+# --- 1) Parse signers into two columns ---
 trans_df[['first_signer', 'second_signer']] = trans_df['signers'].apply(
     lambda x: pd.Series(parse_signers(x))
 )
 
-# --- 2) Build sets of first and second signers (integers) ---
+# --- 2) Get all unique first signer IDs ---
 first_signer_ids = set(trans_df['first_signer'].dropna().astype(int).tolist())
-second_signer_ids = set(trans_df['second_signer'].dropna().astype(int).tolist())
 
-# --- 3) Normalize cont_df transactionContactId to numeric for safe comparison ---
-cont_df = cont_df.copy()  # avoid modifying original reference unexpectedly
+# --- 3) Normalize cont_df transactionContactId to numeric for comparison ---
+cont_df = cont_df.copy()
 cont_df['transactionContactId_num'] = pd.to_numeric(cont_df['transactionContactId'], errors='coerce').astype('Int64')
 
-# --- 4) Remove any cont_df rows that match second signers (when both present) ---
+# --- 4) Keep only rows where the contact ID is a first signer ---
 before_count = len(cont_df)
-cont_df = cont_df[~cont_df['transactionContactId_num'].isin(second_signer_ids)]
-removed_second_count = before_count - len(cont_df)
+cont_df = cont_df[cont_df['transactionContactId_num'].isin(first_signer_ids)].copy()
+removed_count = before_count - len(cont_df)
 
-# --- 5) Determine investmentIds that have at least one 'contact' (case-insensitive) ---
-cont_df['relationship_lc'] = cont_df['relationship'].astype(str).str.lower()
-investment_has_contact = set(
-    cont_df.loc[cont_df['relationship_lc'] == 'contact', 'investmentId'].dropna().unique()
-)
-
-# --- 6) Keep rows according to the rules:
-#    - If an investmentId has a contact, keep only rows for that investment where relationship == 'contact'
-#    - Otherwise, keep rows whose transactionContactId is in the first_signer_ids set
-#
-# Note: use the numeric transactionContactId_num for comparison.
-keep_mask_contact_investments = cont_df['investmentId'].isin(investment_has_contact) & (cont_df['relationship_lc'] == 'contact')
-keep_mask_no_contact = ~cont_df['investmentId'].isin(investment_has_contact) & cont_df['transactionContactId_num'].isin(first_signer_ids)
-
-final_keep_mask = keep_mask_contact_investments | keep_mask_no_contact
-
-before_final_count = len(cont_df)
-cont_df = cont_df[final_keep_mask].copy()
-
-removed_final_count = before_final_count - len(cont_df)
-
-# --- Cleanup temporary columns ---
-cont_df.drop(columns=['transactionContactId_num', 'relationship_lc'], inplace=True)
+# --- 5) Cleanup temporary columns ---
+cont_df.drop(columns=['transactionContactId_num'], inplace=True)
 trans_df.drop(columns=['first_signer', 'second_signer'], inplace=True)
 
-# --- Make both dfs the same length
+# --- 6) Match lengths ---
 num_trans_rows = len(trans_df)
 num_cont_rows = len(cont_df)
 
 if num_cont_rows < num_trans_rows:
-    # Find how many rows we need to add
     rows_to_add = num_trans_rows - num_cont_rows
-
-    # Create empty rows (same columns, filled with NaN)
-    empty_rows = pd.DataFrame(
-        {col: [pd.NA] * rows_to_add for col in cont_df.columns}
-    )
-
-    # Append them to the end of cont_df
+    empty_rows = pd.DataFrame({col: [pd.NA] * rows_to_add for col in cont_df.columns})
     cont_df = pd.concat([cont_df, empty_rows], ignore_index=True)
+
 
 # ------------------------------------------------------------------------------------------------------------------------
 
