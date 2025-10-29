@@ -72,8 +72,7 @@ st.subheader("Step 2️⃣: Provide Input Details")
 contact_domain = st.text_input('Enter "Contact Domain" for sheet 1:')
 vehicle = st.text_input('Enter "Vehicle" for sheet 4:')
 vehicle_close_date = st.text_input('Enter "Specific Vehicle Close Date" (MM/DD/YYYY) for sheet 5:')
-commitment_closing_date = st.text_input('Enter "Investor Commitment Closing Date" (MM/DD/YYYY) for sheet 5:')
-commitment_date = st.text_input('Enter "Investor Commitment Commitment Date" (MM/DD/YYYY) for sheet 5:')
+commitment_date = st.text_input('Enter "Investor Commitment Date" (MM/DD/YYYY) for sheet 5:')
 
 # --- Button to continue ---
 if st.button("Process Data"):
@@ -82,8 +81,7 @@ if st.button("Process Data"):
         st.write("**Contact Domain:**", contact_domain)
         st.write("**Vehicle:**", vehicle)
         st.write("**Vehicle Close Date:**", vehicle_close_date)
-        st.write("**Commitment Closing Date:**", commitment_closing_date)
-        st.write("**Commitment Date:**", commitment_date)
+        st.write("**Investor Commitment Date:**", commitment_date)
     else:
         st.error("Please upload both TRANSACTION and CONTACT files before proceeding.")
 
@@ -360,7 +358,7 @@ df5["Vehicle"] = df4["Vehicle"]
 df5["Specific Vehicle Close Date"] = vehicle_close_date
 df5["Investor"] = df3["Investor Name"]
 df5["Investor Commitment Amount"] = trans_df["commitment"]
-df5["Investor Commitment Closing Date"] = commitment_closing_date
+df5["Investor Commitment Closing Date"] = commitment_date
 df5["Investor Commitment Commitment Date"] = commitment_date
 
 # ------------------------------------------------------------------------------------------------------------------------
@@ -369,7 +367,7 @@ df5["Investor Commitment Commitment Date"] = commitment_date
 df1["Contact Domain"] = contact_domain
 df4["Vehicle"] = vehicle
 df5["Specific Vehicle Close Date"] = vehicle_close_date
-df5["Investor Commitment Closing Date"] = commitment_closing_date
+df5["Investor Commitment Closing Date"] = commitment_date
 df5["Investor Commitment Commitment Date"] = commitment_date
 
 df2["Contact Domain"] = df1["Contact Domain"]
@@ -381,7 +379,7 @@ df5["Vehicle"] = df4["Vehicle"]
 trans_df = trans_df.dropna(subset=["investorName"])
 num_rows = len(trans_df)
 
-# Assign number of transaction rows to all other DataFrames
+# Assign number of transaction rows to all other DataFrames 
 df1 = df1.head(num_rows).copy()
 df2 = df2.head(num_rows).copy()
 df3 = df3.head(num_rows).copy()
