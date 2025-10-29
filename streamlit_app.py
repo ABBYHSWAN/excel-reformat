@@ -409,7 +409,7 @@ st.divider()
 st.subheader("Step 3️⃣: Process & Download") 
 
 st.markdown("Reminder! - Contact ID fields must be filled manually after running through Investran. " \
-            "\n\nThese fields are in sheets **2** and **3**")
+            "\n\nThese fields are in sheets **2** and **3**.")
 
 # Streamlit download button for ZIP
 st.download_button(
