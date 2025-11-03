@@ -237,7 +237,8 @@ investor_subtype_mapping = {
     "corporation": "Corporation",
     "ira": "IRA",
     "privatePension": "Pension Plan",
-    "foundation": "Foundation"
+    "foundation": "Foundation",
+    "governmentNonPension": "Government Entity"
 }
 df3["Investor SubType"] = trans_df["investorType"].map(investor_subtype_mapping).fillna("Unrecognized value") # Handle unrecognized values
 
@@ -270,6 +271,9 @@ accredited_investor_mapping = {
     "No": "N"
 }
 df3["Accredited Investor"] = trans_df["authorizedInvestor"].map(accredited_investor_mapping).fillna("Unrecognized value") # Handle unrecognized values
+# If Qualified Purchaser == "Y", then Accredited Investor should also be "Y"
+df3.loc[df3["Qualified Purchaser"] == "Y", "Accredited Investor"] = "Y"
+
 
 # Assign "Is IRA" using np.where
 df3["Is IRA"] = np.where(trans_df["investorType"] == "ira", "Y", "N")
@@ -341,7 +345,7 @@ form_pf_investor_type_mapping = {
     "formPfUsPension": "State or Municipal Government entity (not pension plan)",
     "formPfUsPerson": "United States Individual or Trust"
 }
-df3["Form PF Investor Type"] = trans_df["formPfInvestorType"].map(form_pf_investor_type_mapping).fillna("Unrecognized value") # Handle unrecognized values
+df3["Form PF Investor Type"] = trans_df["formPfInvestorType"].map(form_pf_investor_type_mapping)
 
 # ------------------------------------------------------------------------------------------------------------------------
 
@@ -388,17 +392,25 @@ df5 = df5.head(num_rows).copy()
 
 # ------------------------------------------------------------------------------------------------------------------------
 
-# Output DataFrame contnets as csv files 
+# Output DataFrame contnets as excel files 
 # Create an in-memory ZIP file
 zip_buffer = io.BytesIO()
 
 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-    # Write each CSV into the ZIP
-    zf.writestr("1 - Investran Contact Upload.csv", df1.to_csv(index=False))
-    zf.writestr("2 - Investran Contact Details.csv", df2.to_csv(index=False))
-    zf.writestr("3 - Investran Investor Upload.csv", df3.to_csv(index=False))
-    zf.writestr("4 - Investran Specific Investors.csv", df4.to_csv(index=False))
-    zf.writestr("5 - Investran Commitments.csv", df5.to_csv(index=False))
+    # Write each Excel file into the ZIP
+    for df, filename in [
+        (df1, "1 - Investran Contact Upload.xlsx"),
+        (df2, "2 - Investran Contact Details.xlsx"),
+        (df3, "3 - Investran Investor Upload.xlsx"),
+        (df4, "4 - Investran Specific Investors.xlsx"),
+        (df5, "5 - Investran Commitments.xlsx"),
+    ]:
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="Sheet1")
+        excel_buffer.seek(0)
+        zf.writestr(filename, excel_buffer.read())
+
 
 # Move to the start of the stream so it can be read
 zip_buffer.seek(0)
