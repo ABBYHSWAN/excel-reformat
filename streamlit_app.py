@@ -242,9 +242,6 @@ investor_subtype_mapping = {
 }
 df3["Investor SubType"] = trans_df["investorType"].map(investor_subtype_mapping).fillna("Unrecognized value") # Handle unrecognized values
 
-# Remove hyphens from 'ssn' and 'ein'
-trans_df["ssn"] = trans_df["ssn"].astype(str).str.replace("-", "")
-trans_df["ein"] = trans_df["ein"].astype(str).str.replace("-", "")
 # Assign df3 "Investor Tax ID" based on 'ssn' and 'ein'
 def get_tax_id(row):
     ssn = row["ssn"]
@@ -257,6 +254,7 @@ def get_tax_id(row):
         return "Error: Exactly one of SSN or EIN must be populated"
 
 df3["Investor Tax ID"] = trans_df.apply(get_tax_id, axis=1)
+df3["Investor Tax ID"] = df3["Investor Tax ID"].astype(str).str.replace("-", "")
 
 # Assign "Qualified Purchaser" using mapping
 qualified_purchaser_mapping = {
