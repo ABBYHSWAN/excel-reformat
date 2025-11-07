@@ -381,6 +381,7 @@ df5["Vehicle"] = df4["Vehicle"]
 trans_df = trans_df.dropna(subset=["investorName"])
 num_rows = len(trans_df)
 
+
 # Assign number of transaction rows to all other DataFrames 
 df1 = df1.head(num_rows).copy()
 df2 = df2.head(num_rows).copy()
@@ -393,6 +394,7 @@ df5 = df5.head(num_rows).copy()
 # Output DataFrame contnets as excel files 
 # Create an in-memory ZIP file
 zip_buffer = io.BytesIO()
+
 
 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
     # Write each Excel file into the ZIP
@@ -408,7 +410,6 @@ with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
             df.to_excel(writer, index=False, sheet_name="Sheet1")
         excel_buffer.seek(0)
         zf.writestr(filename, excel_buffer.read())
-
 
 # Move to the start of the stream so it can be read
 zip_buffer.seek(0)
