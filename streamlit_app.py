@@ -352,8 +352,6 @@ df4["Legal Entity"] = trans_df["fundName"]
 df4["Vehicle"] = vehicle
 df4["Investor"] = df3["Investor Name"]
 
-st.write("df4 populated")
-
 # ------------------------------------------------------------------------------------------------------------------------
 
 # Populate df5
@@ -364,8 +362,6 @@ df5["Investor"] = df3["Investor Name"]
 df5["Investor Commitment Amount"] = trans_df["commitment"]
 df5["Investor Commitment Closing Date"] = commitment_date
 df5["Investor Commitment Commitment Date"] = commitment_date
-
-st.write("df5 populated")
 
 # ------------------------------------------------------------------------------------------------------------------------
 
@@ -381,15 +377,9 @@ df3["Investor Domain"] = df1["Contact Domain"]
 df3["Linked Contact Domain"] = df2["Contact Domain"]
 df5["Vehicle"] = df4["Vehicle"]
 
-st.write("dfs repopulated with inputs")
-
-
 # Make sure all sheets have the same number of rows 
 trans_df = trans_df.dropna(subset=["investorName"])
 num_rows = len(trans_df)
-
-st.write("num rows recorded")
-
 
 # Assign number of transaction rows to all other DataFrames 
 df1 = df1.head(num_rows).copy()
@@ -398,17 +388,11 @@ df3 = df3.head(num_rows).copy()
 df4 = df4.head(num_rows).copy()
 df5 = df5.head(num_rows).copy()
 
-st.write("df rows matched")
-
-
 # ------------------------------------------------------------------------------------------------------------------------
 
 # Output DataFrame contnets as excel files 
 # Create an in-memory ZIP file
 zip_buffer = io.BytesIO()
-st.write("zip buffer created")
-
-
 
 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
     # Write each Excel file into the ZIP
@@ -425,14 +409,8 @@ with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         excel_buffer.seek(0)
         zf.writestr(filename, excel_buffer.read())
 
-st.write("with statement fully executed")
-
-
 # Move to the start of the stream so it can be read
 zip_buffer.seek(0)
-
-st.write("buffer seeked")
-
 
 st.divider()
 st.subheader("Step 3️⃣: Process & Download") 
