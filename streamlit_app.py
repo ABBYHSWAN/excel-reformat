@@ -3,6 +3,8 @@ import io
 import pandas as pd
 import numpy as np
 import zipfile
+import ast
+import re
 
 # --- Hide Streamlit default error tracebacks ---
 hide_streamlit_style = """
@@ -115,55 +117,64 @@ df5 = pd.DataFrame(columns=["Legal Entity", "Vehicle", "Specific Vehicle Close D
 # ------------------------------------------------------------------------------------------------------------------------
 
 # Remove unecessary contacts
+def parse_signers_robust(value):
+    """
+    Return a list of integer signer IDs extracted from 'value'.
+    Handles formats like:
+      - [1234567, 7654321]
+      - "[1234567,7654321]" or "[1234567, null]"
+      - NaN -> []
+    """
+    if pd.isna(value):
+        return []
+    if isinstance(value, (list, tuple)):
+        ids = []
+        for x in value:
+            if isinstance(x, int):
+                ids.append(x)
+            elif isinstance(x, str) and x.isdigit():
+                ids.append(int(x))
+        return ids
 
-# --- Helper to parse signers like "[1234567,7654321]" or "[1234567,null]" ---
-def parse_signers(value):
     s = str(value).strip()
-    if not s or s.lower() == 'nan':
-        return [None, None]
-    s = s.strip("[]").replace(" ", "")
-    parts = s.split(",")
-    if len(parts) == 1:
-        parts = parts + [None]
-    parsed = []
-    for p in parts[:2]:
-        if p is None:
-            parsed.append(None)
-        else:
-            pl = str(p).strip()
-            parsed.append(None if pl.lower() == "null" or pl == "" else int(pl))
-    return parsed  # [first_signer_or_None, second_signer_or_None]
+    try:
+        parsed = ast.literal_eval(s)
+        if isinstance(parsed, (list, tuple)):
+            ids = []
+            for x in parsed:
+                if isinstance(x, int):
+                    ids.append(x)
+                elif isinstance(x, str) and x.isdigit():
+                    ids.append(int(x))
+            if ids:
+                return ids
+    except Exception:
+        pass
 
-# --- 1) Parse signers into two columns ---
-trans_df[['first_signer', 'second_signer']] = trans_df['signers'].apply(
-    lambda x: pd.Series(parse_signers(x))
-)
+    found = re.findall(r'\b(\d{7})\b', s)
+    return [int(x) for x in found]
 
-# --- 2) Get all unique first signer IDs ---
-first_signer_ids = set(trans_df['first_signer'].dropna().astype(int).tolist())
+# Parse and extract signer IDs
+trans_df["parsed_signers"] = trans_df["signers"].apply(parse_signers_robust)
+trans_df["first_signer"] = trans_df["parsed_signers"].apply(lambda x: int(x[0]) if len(x) >= 1 else None)
+trans_df["second_signer"] = trans_df["parsed_signers"].apply(lambda x: int(x[1]) if len(x) >= 2 else None)
 
-# --- 3) Normalize cont_df transactionContactId to numeric for comparison ---
-cont_df = cont_df.copy()
-cont_df['transactionContactId_num'] = pd.to_numeric(cont_df['transactionContactId'], errors='coerce').astype('Int64')
+# Build ID sets
+first_ids = set(trans_df["first_signer"].dropna().astype(int).tolist())
+second_ids = set(trans_df["second_signer"].dropna().astype(int).tolist())
+all_signer_ids = set()
+for lst in trans_df["parsed_signers"]:
+    all_signer_ids.update(lst)
 
-# --- 4) Keep only rows where the contact ID is a first signer ---
-before_count = len(cont_df)
-cont_df = cont_df[cont_df['transactionContactId_num'].isin(first_signer_ids)].copy()
-removed_count = before_count - len(cont_df)
+# Keep only rows where transactionContactId is a valid first signer
+filtered_cont_df = cont_df[cont_df["transactionContactId"].isin(first_ids)].copy()
 
-# --- 5) Cleanup temporary columns ---
-cont_df.drop(columns=['transactionContactId_num'], inplace=True)
-trans_df.drop(columns=['first_signer', 'second_signer'], inplace=True)
+# Preserve original order
+filtered_cont_df = filtered_cont_df.reset_index(drop=True)
 
-# --- 6) Match lengths ---
-num_trans_rows = len(trans_df)
-num_cont_rows = len(cont_df)
-
-if num_cont_rows < num_trans_rows:
-    rows_to_add = num_trans_rows - num_cont_rows
-    empty_rows = pd.DataFrame({col: [pd.NA] * rows_to_add for col in cont_df.columns})
-    cont_df = pd.concat([cont_df, empty_rows], ignore_index=True)
-
+# (Optional) Clean up helper columns if not needed
+trans_df.drop(columns=["parsed_signers", "first_signer", "second_signer"], inplace=True)
+cont_df = filtered_cont_df
 
 # ------------------------------------------------------------------------------------------------------------------------
 
