@@ -223,7 +223,7 @@ df2["Primary Phone"] = np.where(df2["Home Phone"].notna(), "yes", pd.NA)
 # Populate df 3
 df3["Investor Domain"] = df1["Contact Domain"]
 df3["Investor Socium ID"] = trans_df["investorSourceId"]
-df3["Investor Name"]  = trans_df["investorName"] + ": " + trans_df["investorSourceId"]
+df3["Investor Name"]  = trans_df["investorName"] + ":  " + trans_df["investorSourceId"]
 df3["Linked Contact"] = df2["Contact File As"]
 df3["Linked Contact ID"] = df2["Contact ID"]
 df3["Linked Contact Type"] = df2["Contact Type"]
