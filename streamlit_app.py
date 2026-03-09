@@ -22,8 +22,6 @@ st.set_page_config(page_title="File Reformatting App",
 st.title("📁 Platform Eleven to Investran  Excel Sheet Converter")
 st.caption("Easily upload, process, and download your Investran data files.")
 
-st.write("executed 1")
-
 # --- File uploaders ---
 st.subheader("Step 1️⃣: Upload Files")
 # Initialize dataframes if uploaded 
@@ -78,8 +76,6 @@ vehicle = st.text_input('Enter "Vehicle" for sheet 4:')
 vehicle_close_date = st.text_input('Enter "Specific Vehicle Close Date" (MM/DD/YYYY) for sheet 5:')
 commitment_date = st.text_input('Enter "Investor Commitment Date" (MM/DD/YYYY) for sheet 5:')
 
-st.write("executed 2")
-
 # --- Button to continue ---
 process_clicked = st.button("Process Data")
 
@@ -94,8 +90,6 @@ if process_clicked:
     st.write("**Vehicle Close Date:**", vehicle_close_date)
     st.write("**Investor Commitment Date:**", commitment_date)
 
-
-    st.write("executed 3")
     # ------------------------------------------------------------------------------------------------------------------------
 
     # Initialize additional packages and import and reformat starting CSVs
@@ -122,7 +116,7 @@ if process_clicked:
     df4 = pd.DataFrame(columns=["Legal Entity", "Vehicle", "Investor"])
     df5 = pd.DataFrame(columns=["Legal Entity", "Vehicle", "Specific Vehicle Close Date", "Investor", "Investor Commitment Amount",
                                 "Investor Commitment Closing Date", "Investor Commitment Commitment Date"])
-    st.write("executed 4")
+
     # ------------------------------------------------------------------------------------------------------------------------
 
     # Remove unecessary contacts
@@ -184,7 +178,7 @@ if process_clicked:
     # (Optional) Clean up helper columns if not needed
     trans_df.drop(columns=["parsed_signers", "first_signer", "second_signer"], inplace=True)
     cont_df = filtered_cont_df
-    st.write("executed 5")
+
     # ------------------------------------------------------------------------------------------------------------------------
 
     # Populate df1
@@ -193,7 +187,7 @@ if process_clicked:
     df1["Contact Type"] = "Individual"
     df1["Individual First Name"] = cont_df["firstName"]
     df1["Individual Last Name"] = cont_df["lastName"]
-    st.write("executed 6")
+
     # ------------------------------------------------------------------------------------------------------------------------
 
     # Populate df2
@@ -226,7 +220,7 @@ if process_clicked:
     df2["Business Address Zip/Postal Code"] = trans_df["zip"]
     df2["Home Phone"] = cont_df["contactPhone"]
     df2["Primary Phone"] = df2["Home Phone"].notna().map({True: "yes", False: pd.NA})
-    st.write("executed 6")
+
     # ------------------------------------------------------------------------------------------------------------------------
 
     # Populate df 3
@@ -239,12 +233,6 @@ if process_clicked:
     df3["Linked Contact Domain"] = df2["Contact Domain"]
     df3["Client GL Investor Name"] = trans_df["investorName"]
     df3["Investor Legal Name"] = trans_df["investorName"]
-   
-    st.write(len(df3["Investor Socium ID"]))
-    st.write(len(trans_df["investorSourceId"]))
-    st.write(len(df3["Investor Classification"]))
-    st.write(len(trans_df["personOrEntity"]))
-
 
     # df3 "Investor Classification"
     df3["Investor Classification"] = (
@@ -252,14 +240,8 @@ if process_clicked:
         .map({ "entity": "Organization" })
         .fillna("Individual")
     )
-    
 
     df3["Individual or Organization"] = df3["Investor Classification"]
-
-    st.write(len(df3["Investor Socium ID"]))
-    st.write(len(trans_df["investorSourceId"]))
-    st.write(len(df3["Investor Classification"]))
-    st.write(len(trans_df["personOrEntity"]))
 
     # Assign df3 "Investor SubType" using a mapping
     investor_subtype_mapping = {
@@ -378,14 +360,14 @@ if process_clicked:
         "formPfUsPerson": "United States Individual or Trust"
     }
     df3["Form PF Investor Type"] = trans_df["formPfInvestorType"].map(form_pf_investor_type_mapping)
-    st.write("executed 7")
+
     # ------------------------------------------------------------------------------------------------------------------------
 
     # Populate df4
     df4["Legal Entity"] = trans_df["fundName"]
     df4["Vehicle"] = vehicle
     df4["Investor"] = df3["Investor Name"]
-    st.write("executed 8")
+
     # ------------------------------------------------------------------------------------------------------------------------
 
     # Populate df5
@@ -396,7 +378,7 @@ if process_clicked:
     df5["Investor Commitment Amount"] = trans_df["commitment"]
     df5["Investor Commitment Closing Date"] = commitment_date
     df5["Investor Commitment Commitment Date"] = commitment_date
-    st.write("executed 9")
+
     # ------------------------------------------------------------------------------------------------------------------------
 
     # Make sure manual input domains are properly assigned
@@ -422,7 +404,7 @@ if process_clicked:
     df3 = df3.head(num_rows).copy()
     df4 = df4.head(num_rows).copy()
     df5 = df5.head(num_rows).copy()
-    st.write("executed 10")
+
     # ------------------------------------------------------------------------------------------------------------------------
 
     # Output DataFrame contnets as excel files 
@@ -462,5 +444,3 @@ if process_clicked:
         file_name= "Investran Uploads Reformatted.zip",
         mime= "application/zip"
     )
-
-    st.write("executed final")
